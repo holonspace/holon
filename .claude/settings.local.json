@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cat apps/api/src/*.ts)",
+      "Bash(find apps/api/src/document -type f -exec cat {} \\\\;)"
+    ]
+  }
+}
