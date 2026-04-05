@@ -5,16 +5,18 @@ import {
 import { sql } from 'drizzle-orm'
 import { customType } from 'drizzle-orm/pg-core'
 
-// pgvector custom type (drizzle-orm built-in vector may vary by version)
-const vector = customType<{ data: number[]; driverData: string }>({
+// pgvector custom type — nullable-safe (embedding column allows NULL)
+const vector = customType<{ data: number[] | null; driverData: string | null }>({
   dataType(config?: { dimensions?: number }) {
     return config?.dimensions ? `vector(${config.dimensions})` : 'vector'
   },
-  fromDriver(value: string): number[] {
-    // Postgres returns vector as "[1,2,3]" string
+  fromDriver(value: string | null): number[] | null {
+    // Postgres returns vector as "[1,2,3]" string; guard against NULL
+    if (value === null || value === undefined) return null
     return value.slice(1, -1).split(',').map(Number)
   },
-  toDriver(value: number[]): string {
+  toDriver(value: number[] | null): string | null {
+    if (value === null || value === undefined) return null
     return `[${value.join(',')}]`
   },
 })

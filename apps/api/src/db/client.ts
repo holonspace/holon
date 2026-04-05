@@ -1,14 +1,25 @@
 import { drizzle } from 'drizzle-orm/node-postgres'
-import { Pool } from 'pg'
+import { Client } from 'pg'
 import * as schema from './schema'
 
-export function createDb(connectionString: string) {
-  const pool = new Pool({
+/**
+ * Create a Drizzle ORM instance backed by a single pg.Client.
+ *
+ * CF Workers runtime cancels dangling socket event-listeners after each
+ * response unless `ctx.waitUntil(client.end())` is called.  Callers must
+ * schedule that cleanup themselves via `c.executionCtx.waitUntil(client.end())`.
+ *
+ * Returns both the Drizzle `db` handle and the raw `client` so callers can
+ * call `client.end()` in a `waitUntil` to avoid Miniflare "hung" errors.
+ */
+export async function createDb(connectionString: string) {
+  const client = new Client({
     connectionString,
     ssl: false,          // local Docker; set ssl: true for production Neon/RDS
-    max: 5,
   })
-  return drizzle(pool, { schema })
+  await client.connect()
+  const db = drizzle(client, { schema })
+  return { db, client }
 }
 
-export type Db = ReturnType<typeof createDb>
+export type Db = Awaited<ReturnType<typeof createDb>>['db']

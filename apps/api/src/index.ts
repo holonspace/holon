@@ -10,14 +10,28 @@ type Variables = { db: ReturnType<typeof createDb> }
 
 const app = new OpenAPIHono<{ Bindings: Bindings; Variables: Variables }>()
 
-// Singleton DB pool per Worker isolate — CF Workers reuses isolates across
-// requests, so module-level singleton avoids creating a new Pool every request.
-let _db: ReturnType<typeof createDb> | null = null
+// Per-request pg.Client pattern (recommended for CF Workers without Hyperdrive).
+//
+// CF Workers runtime cancels dangling socket event-listeners after each response.
+// We create a fresh Client per request and use ctx.waitUntil(client.end()) to
+// cleanly close the connection AFTER the response is sent.
+//
+// For production, replace with Hyperdrive + a module-level Pool.
 
 app.use('*', async (c, next) => {
-  if (!_db) _db = createDb(c.env.DB_URL)
-  c.set('db', _db)
-  await next()
+  const { db, client } = await createDb(c.env.DB_URL)
+  c.set('db', db)
+  try {
+    await next()
+  } finally {
+    // Schedule connection cleanup after response is flushed.
+    c.executionCtx.waitUntil(client.end())
+  }
+})
+
+app.onError((err, c) => {
+  console.error('[onError]', err)
+  return c.json({ error: err.message }, 500)
 })
 
 app.route('/', collectionRoute)
