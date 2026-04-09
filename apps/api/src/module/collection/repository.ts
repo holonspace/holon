@@ -49,10 +49,27 @@ export function createCollectionRepository(db: Database) {
     },
 
     /**
-     * 列出所有 collections。
+     * 列出 collections。
+     * - 不傳 ancestorInternalId：回傳所有 collections。
+     * - 傳入 ancestorInternalId：透過 collection_closure 只回傳該節點本身及其所有後代。
      */
-    async listCollections(): Promise<CollectionRow[]> {
-      return db.select().from(collection)
+    async listCollections(ancestorInternalId?: number): Promise<CollectionRow[]> {
+      if (ancestorInternalId === undefined) {
+        return db.select().from(collection)
+      }
+      return db
+        .select({
+          id: collection.id,
+          collectionId: collection.collectionId,
+          title: collection.title,
+          description: collection.description,
+          metadata: collection.metadata,
+          createdAt: collection.createdAt,
+          updatedAt: collection.updatedAt,
+        })
+        .from(collection)
+        .innerJoin(collectionClosure, eq(collectionClosure.descendantId, collection.id))
+        .where(eq(collectionClosure.ancestorId, ancestorInternalId))
     },
 
     /**
@@ -236,10 +253,28 @@ export function createCollectionRepository(db: Database) {
 
     /**
      * 列出集合內所有文件（已過濾軟刪除）。
+     * @param options.recursive 若為 true，同時包含所有子孫 collection 的文件（去重）。
      */
-    async listDocumentsInCollection(collectionInternalId: number): Promise<Document[]> {
+    async listDocumentsInCollection(
+      collectionInternalId: number,
+      options: { recursive?: boolean } = {},
+    ): Promise<Document[]> {
+      const { recursive = false } = options
+
+      let targetIds: number[]
+
+      if (recursive) {
+        const rows = await db
+          .select({ id: collectionClosure.descendantId })
+          .from(collectionClosure)
+          .where(eq(collectionClosure.ancestorId, collectionInternalId))
+        targetIds = rows.map((r) => r.id)
+      } else {
+        targetIds = [collectionInternalId]
+      }
+
       return db
-        .select({
+        .selectDistinct({
           id: document.id,
           documentId: document.documentId,
           title: document.title,
@@ -254,7 +289,7 @@ export function createCollectionRepository(db: Database) {
         .innerJoin(document, eq(documentToCollection.documentId, document.id))
         .where(
           and(
-            eq(documentToCollection.collectionId, collectionInternalId),
+            inArray(documentToCollection.collectionId, targetIds),
             isNull(document.deletedAt),
           ),
         )

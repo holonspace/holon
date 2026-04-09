@@ -18,7 +18,9 @@ export const CollectionParamsSchema = z.object({
   collectionId: z.string().uuid(),
 })
 
-export const CollectionQuerySchema = z.object({})
+export const CollectionQuerySchema = z.object({
+  collectionId: z.string().uuid().optional(),
+})
 
 // ── Response Schema ────────────────────────────────────────────────────────────
 
@@ -43,6 +45,14 @@ export const AddDocumentToCollectionSchema = z.object({
   documentId: z.string().uuid(),
 })
 
+export const ListDocumentsQuerySchema = z.object({
+  recursive: z
+    .string()
+    .optional()
+    .transform((v) => v === 'true')
+    .openapi({ type: 'boolean', description: '若為 true，包含所有子 collection 的文件' }),
+})
+
 export const DocumentCollectionParamsSchema = z.object({
   collectionId: z.string().uuid(),
   documentId: z.string().uuid(),
@@ -53,6 +63,7 @@ export const DocumentSummarySchema = z.object({
   title: z.string(),
   description: z.string().nullable(),
   metadata: z.record(z.string(), z.unknown()).nullable(),
+  content: z.record(z.string(), z.unknown()).nullable(),
   createdAt: z.string(),
   updatedAt: z.string(),
 })
@@ -64,4 +75,5 @@ export type UpdateCollectionDto = z.infer<typeof UpdateCollectionSchema>
 export type CollectionDto = z.infer<typeof CollectionSchema>
 export type MoveToParentDto = z.infer<typeof MoveToParentSchema>
 export type AddDocumentToCollectionDto = z.infer<typeof AddDocumentToCollectionSchema>
+export type ListDocumentsQueryDto = z.infer<typeof ListDocumentsQuerySchema>
 export type DocumentSummaryDto = z.infer<typeof DocumentSummarySchema>

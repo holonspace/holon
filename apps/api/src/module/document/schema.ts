@@ -4,8 +4,8 @@ import { z } from 'zod'
 export const CreateDocumentSchema = z.object({
   title: z.string().min(1).max(255),
   description: z.string().nullable().optional(),
-  content: DocumentContentSchema.nullable(),
-  metadata: DocumentMetadataSchema.nullable(),
+  content: DocumentContentSchema.nullable().optional(),
+  metadata: DocumentMetadataSchema.nullable().optional(),
 })
 
 export const DocumentSchema = z.object({

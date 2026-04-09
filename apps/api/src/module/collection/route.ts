@@ -8,6 +8,7 @@ import {
   CreateCollectionSchema,
   DocumentCollectionParamsSchema,
   DocumentSummarySchema,
+  ListDocumentsQuerySchema,
   MoveToParentSchema,
   UpdateCollectionSchema,
 } from '@/module/collection/schema'
@@ -18,12 +19,13 @@ const router = new OpenAPIHono<Env>()
 
 // ── 共用工具 ───────────────────────────────────────────────────────────────────
 
-function toDocumentDto(d: { documentId: string; title: string; description: string | null; metadata: unknown; createdAt: Date; updatedAt: Date }): DocumentSummaryDto {
+function toDocumentDto(d: { documentId: string; title: string; description: string | null; metadata: unknown; content: unknown; createdAt: Date; updatedAt: Date }): DocumentSummaryDto {
   return {
     id: d.documentId,
     title: d.title,
     description: d.description ?? null,
     metadata: (d.metadata as Record<string, unknown>) ?? null,
+    content: (d.content as Record<string, unknown>) ?? null,
     createdAt: d.createdAt.toISOString(),
     updatedAt: d.updatedAt.toISOString(),
   }
@@ -91,9 +93,17 @@ router.openapi(
     },
   }),
   async (c) => {
+    const { collectionId } = c.req.valid('query')
     const collectionRepository = c.get('collectionRepository')
 
-    const collections = await collectionRepository.listCollections()
+    let ancestorInternalId: number | undefined
+    if (collectionId !== undefined) {
+      const col = await collectionRepository.findCollectionByCollectionId(collectionId)
+      if (!col) throw new NotFoundException('Collection not found')
+      ancestorInternalId = col.id
+    }
+
+    const collections = await collectionRepository.listCollections(ancestorInternalId)
 
     return c.json(collections.map(toDto), 200)
   },
@@ -350,6 +360,7 @@ router.openapi(
     path: '/collections/{collectionId}/documents',
     request: {
       params: CollectionParamsSchema,
+      query: ListDocumentsQuerySchema,
     },
     responses: {
       200: {
@@ -360,12 +371,13 @@ router.openapi(
   }),
   async (c) => {
     const { collectionId } = c.req.valid('param')
+    const { recursive } = c.req.valid('query')
     const collectionRepo = c.get('collectionRepository')
 
     const col = await collectionRepo.findCollectionByCollectionId(collectionId)
     if (!col) throw new NotFoundException('Collection not found')
 
-    const docs = await collectionRepo.listDocumentsInCollection(col.id)
+    const docs = await collectionRepo.listDocumentsInCollection(col.id, { recursive })
 
     return c.json(docs.map(toDocumentDto), 200)
   },

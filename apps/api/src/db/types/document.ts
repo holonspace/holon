@@ -3,7 +3,7 @@ import type { document } from '../schema/document'
 
 // ── JSONB 欄位 Zod Schema（單一來源）─────────────────────
 export const DocumentContentSchema = z.object({
-  type: z.string(),
+
 }).catchall(z.any())
 
 export const DocumentMetadataSchema = z.object({
