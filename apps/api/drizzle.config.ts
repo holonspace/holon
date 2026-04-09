@@ -2,9 +2,9 @@ import { defineConfig } from 'drizzle-kit'
 
 export default defineConfig({
   schema: './src/db/schema.ts',
-  out:    './src/db/migrations',
+  out: './migrations',
   dialect: 'postgresql',
   dbCredentials: {
-    url: process.env.DB_URL ?? 'postgresql://postgres:postgres@localhost:5432/holon',
+    url: process.env.DATABASE_URL!,
   },
 })

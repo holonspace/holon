@@ -1,42 +1,39 @@
-import { OpenAPIHono } from '@hono/zod-openapi'
+import { createDB } from '@/db'
+import { chunkRoute, collectionRoute, documentRoute, searchRoute } from '@/module'
+import { createChunkRepository } from '@/module/chunk/repository'
+import { createCollectionRepository } from '@/module/collection/repository'
+import { createDocumentRepository } from '@/module/document/repository'
+import { createSearchRepository } from '@/module/search/repository'
+import { Env } from '@/types'
 import { swaggerUI } from '@hono/swagger-ui'
-import { createDb } from '@/db/client'
-import collectionRoute from '@/modules/collection/route'
-import documentRoute   from '@/modules/document/route'
-import searchRoute     from '@/modules/search/route'
+import { OpenAPIHono } from '@hono/zod-openapi'
+import { HTTPException } from 'hono/http-exception'
 
-type Bindings = { DB_URL: string }
-type Variables = { db: ReturnType<typeof createDb> }
 
-const app = new OpenAPIHono<{ Bindings: Bindings; Variables: Variables }>()
-
-// Per-request pg.Client pattern (recommended for CF Workers without Hyperdrive).
-//
-// CF Workers runtime cancels dangling socket event-listeners after each response.
-// We create a fresh Client per request and use ctx.waitUntil(client.end()) to
-// cleanly close the connection AFTER the response is sent.
-//
-// For production, replace with Hyperdrive + a module-level Pool.
+const app = new OpenAPIHono<Env>()
 
 app.use('*', async (c, next) => {
-  const { db, client } = await createDb(c.env.DB_URL)
+  const db = createDB(c.env.DATABASE_URL)
   c.set('db', db)
-  try {
-    await next()
-  } finally {
-    // Schedule connection cleanup after response is flushed.
-    c.executionCtx.waitUntil(client.end())
-  }
+  c.set('documentRepository', createDocumentRepository(db))
+  c.set('chunkRepository', createChunkRepository(db))
+  c.set('searchRepository', createSearchRepository(db))
+  c.set('collectionRepository', createCollectionRepository(db))
+  await next()
 })
 
 app.onError((err, c) => {
-  console.error('[onError]', err)
-  return c.json({ error: err.message }, 500)
+  console.error(err)
+  if (err instanceof HTTPException) {
+    return c.json({ error: err.message }, err.status)
+  }
+  return c.json({ error: 'Internal Server Error' }, 500)
 })
 
-app.route('/', collectionRoute)
 app.route('/', documentRoute)
+app.route('/', chunkRoute)
 app.route('/', searchRoute)
+app.route('/', collectionRoute)
 
 app.get('/ui', swaggerUI({ url: '/doc' }))
 
