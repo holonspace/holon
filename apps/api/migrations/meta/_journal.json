@@ -15,6 +15,13 @@
       "when": 1775551596257,
       "tag": "0001_superb_bloodaxe",
       "breakpoints": true
+    },
+    {
+      "idx": 2,
+      "version": "7",
+      "when": 1775819417262,
+      "tag": "0002_giant_silver_samurai",
+      "breakpoints": true
     }
   ]
 }

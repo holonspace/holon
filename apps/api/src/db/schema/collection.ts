@@ -1,4 +1,4 @@
-import { index, integer, jsonb, pgTable, primaryKey, serial, text, timestamp, uuid, varchar } from 'drizzle-orm/pg-core'
+import { index, integer, jsonb, pgTable, primaryKey, serial, text, timestamp, uuid, varchar, vector } from 'drizzle-orm/pg-core'
 import type { CollectionMetadata } from '../types/collection'
 import { document } from './document'
 
@@ -8,10 +8,12 @@ export const collection = pgTable('collection', {
   title: varchar('title', { length: 255 }).notNull(),
   description: text('description'),
   metadata: jsonb('metadata').$type<CollectionMetadata>().default({}),
+  embedding: vector('embedding', { dimensions: 1536 }),
   createdAt: timestamp('created_at').defaultNow().notNull(),
   updatedAt: timestamp('updated_at').defaultNow().notNull(),
 }, (t) => [
   index('collection_id_idx').on(t.collectionId),
+  index('collection_embedding_idx').using('hnsw', t.embedding.op('vector_cosine_ops')),
 ])
 
 export const collectionClosure = pgTable('collection_closure', {

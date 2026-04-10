@@ -3,7 +3,7 @@ import { collection, collectionClosure, documentToCollection } from '@/db/schema
 import { document } from '@/db/schema/document'
 import type { CollectionMetadata } from '@/db/types/collection'
 import type { Document } from '@/db/types/document'
-import { and, eq, inArray, isNull, not } from 'drizzle-orm'
+import { and, eq, inArray, isNotNull, isNull, not, sql } from 'drizzle-orm'
 
 type CollectionRow = typeof collection.$inferSelect
 
@@ -13,7 +13,7 @@ export function createCollectionRepository(db: Database) {
      * 建立 collection 並插入 closure table 自身行（depth=0）。
      */
     async createCollection(
-      data: { title: string; description?: string | null; metadata?: CollectionMetadata | null },
+      data: { title: string; description?: string | null; metadata?: CollectionMetadata | null; embedding?: number[] | null },
     ): Promise<CollectionRow> {
       return db.transaction(async (tx) => {
         const [newCollection] = await tx
@@ -22,6 +22,7 @@ export function createCollectionRepository(db: Database) {
             title: data.title,
             description: data.description ?? null,
             metadata: (data.metadata ?? {}) as CollectionMetadata,
+            ...(data.embedding ? { embedding: data.embedding } : {}),
           })
           .returning()
 
@@ -64,6 +65,7 @@ export function createCollectionRepository(db: Database) {
           title: collection.title,
           description: collection.description,
           metadata: collection.metadata,
+          embedding: collection.embedding,
           createdAt: collection.createdAt,
           updatedAt: collection.updatedAt,
         })
@@ -77,12 +79,13 @@ export function createCollectionRepository(db: Database) {
      */
     async updateCollection(
       collectionId: string,
-      data: { title?: string; description?: string | null; metadata?: CollectionMetadata | null },
+      data: { title?: string; description?: string | null; metadata?: CollectionMetadata | null; embedding?: number[] | null },
     ): Promise<CollectionRow | null> {
       const updateData: Partial<typeof collection.$inferInsert> = {}
       if (data.title !== undefined) updateData.title = data.title
       if (data.description !== undefined) updateData.description = data.description
       if (data.metadata !== undefined) updateData.metadata = data.metadata as CollectionMetadata
+      if (data.embedding !== undefined) updateData.embedding = data.embedding as unknown as typeof collection.$inferInsert['embedding']
       updateData.updatedAt = new Date()
 
       const [updated] = await db
@@ -293,6 +296,40 @@ export function createCollectionRepository(db: Database) {
             isNull(document.deletedAt),
           ),
         )
+    },
+
+    /**
+     * 向量語意搜尋 collections（純 cosine similarity）。
+     * 篩選 embedding IS NOT NULL，以 cosine distance 升序排序。
+     * score = 1 − cosine_distance（0~1，越高越相關）。
+     */
+    async searchCollections(opts: {
+      embeddingVector: number[]
+      limit: number
+    }): Promise<Array<CollectionRow & { score: number }>> {
+      const { embeddingVector, limit } = opts
+      const embeddingStr = `[${embeddingVector.join(',')}]`
+
+      type Row = typeof collection.$inferSelect & { score: string }
+
+      const rows = await db
+        .select({
+          id: collection.id,
+          collectionId: collection.collectionId,
+          title: collection.title,
+          description: collection.description,
+          metadata: collection.metadata,
+          embedding: collection.embedding,
+          createdAt: collection.createdAt,
+          updatedAt: collection.updatedAt,
+          score: sql<string>`1 - (embedding <=> ${sql.raw(`'${embeddingStr}'`)}::vector)`,
+        })
+        .from(collection)
+        .where(isNotNull(collection.embedding))
+        .orderBy(sql`embedding <=> ${sql.raw(`'${embeddingStr}'`)}::vector`)
+        .limit(limit) as Row[]
+
+      return rows.map((r) => ({ ...r, score: parseFloat(r.score) }))
     },
 
     /**

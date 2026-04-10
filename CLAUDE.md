@@ -41,6 +41,7 @@ docker compose up -d  # start PostgreSQL with pgvector + pg_trgm extensions
 Local secrets go in `apps/api/.dev.vars` (Cloudflare Workers convention, gitignored):
 ```
 DATABASE_URL=postgres://postgres:postgres@localhost:5432/holon
+OPENAI_API_KEY=sk-...   # required for collection embedding (create/search)
 ```
 
 ## Architecture
@@ -59,6 +60,8 @@ Each domain module lives in `src/module/<name>/` with three files:
 - `repository.ts` — DB access via factory function `create<Name>Repository(db)`, returns object of async methods
 - `schema.ts` — Zod schemas for request/response bodies, plus DTO types
 
+Complex modules may split routes into a `routes/` subdirectory and add `helpers.ts` for shared logic (e.g. `collection/routes/` contains separate files per resource: collection, documents, parent, search).
+
 Modules are registered in `src/module/index.ts` and mounted in `src/index.ts`.
 
 ### Dependency Injection
@@ -72,7 +75,7 @@ The `Env` type in `src/types.ts` defines what's available in `Bindings` (env var
 Three core tables:
 - **`document`** — top-level document with `content: jsonb` (blocks array) and `metadata: jsonb`
 - **`chunk`** — text segment of a document with `embedding: vector(1536)`, `position`, and `content` text; has HNSW cosine index and GIN trigram index for hybrid search
-- **`collection`** — hierarchical folder/group using the **closure table pattern** (`collection_closure` stores ancestor/descendant/depth rows); documents join collections via `document_to_collection`
+- **`collection`** — hierarchical folder/group using the **closure table pattern** (`collection_closure` stores ancestor/descendant/depth rows); documents join collections via `document_to_collection`; also has `embedding: vector(1536)` for semantic collection search via `@langchain/openai` (`text-embedding-3-small`)
 
 Soft delete is implemented on `document` and `chunk` via `deleted_at` timestamp (always filter `isNull(deletedAt)` in queries).
 

@@ -15,7 +15,7 @@ export const UpdateCollectionSchema = z.object({
 })
 
 export const CollectionParamsSchema = z.object({
-  collectionId: z.string().uuid(),
+  collectionId: z.uuid(),
 })
 
 export const CollectionQuerySchema = z.object({
@@ -58,6 +58,17 @@ export const DocumentCollectionParamsSchema = z.object({
   documentId: z.string().uuid(),
 })
 
+// ── Collection Search ──────────────────────────────────────────────────────────
+
+export const CollectionSearchBodySchema = z.object({
+  query: z.string().min(1),
+  limit: z.number().int().min(1).max(100).optional(),
+})
+
+export const CollectionSearchResultSchema = CollectionSchema.extend({
+  score: z.number().openapi({ description: 'Cosine similarity score (0~1, higher = more relevant)' }),
+})
+
 export const DocumentSummarySchema = z.object({
   id: z.string().uuid(),
   title: z.string(),
@@ -70,6 +81,8 @@ export const DocumentSummarySchema = z.object({
 
 // ── DTO Types ──────────────────────────────────────────────────────────────────
 
+export type CollectionSearchBodyDto   = z.infer<typeof CollectionSearchBodySchema>
+export type CollectionSearchResultDto = z.infer<typeof CollectionSearchResultSchema>
 export type CreateCollectionDto = z.infer<typeof CreateCollectionSchema>
 export type UpdateCollectionDto = z.infer<typeof UpdateCollectionSchema>
 export type CollectionDto = z.infer<typeof CollectionSchema>
