@@ -10,7 +10,7 @@ router.openapi(
   createRoute({
     tags: ['Search'],
     summary: 'Hybrid search',
-    description: 'Perform a hybrid search combining vector similarity (cosine via HNSW index) and full-text trigram search (pg_trgm) using Reciprocal Rank Fusion (RRF). Optionally scope results to a specific collection or document. Returns ranked chunks with relevance scores.',
+    description: 'Perform a hybrid search combining vector similarity and BM25 full-text search using Weighted RRF (Reciprocal Rank Fusion). Scores range ~0.016–0.033 (k=60). Control vector emphasis via vectorWeight (default 1.0, > 1.0 boosts vector ranking). Adjust RRF constant k (default 60). Optionally filter by minScore, collectionId, or documentId. Use contextWindow (0–10) to automatically include adjacent chunks before and after each hit for richer RAG context.',
     method: 'post',
     path: '/search',
     request: {
@@ -24,7 +24,7 @@ router.openapi(
     },
   }),
   async (c) => {
-    const { query, limit, k, minScore, collectionId, documentId } = c.req.valid('json')
+    const { query, limit, k, vectorWeight, minScore, collectionId, documentId, contextWindow } = c.req.valid('json')
 
     // 1. 生成 query embedding（與 chunk 建立時使用相同模型）
     const embeddings = new OpenAIEmbeddings({
@@ -33,16 +33,33 @@ router.openapi(
     })
     const embeddingVector = await embeddings.embedQuery(query)
 
-    // 2. RRF 混合搜尋
+    // 2. Weighted RRF 混合搜尋（分數範圍 ~0.016~0.033，k=60）
     const searchRepository = c.get('searchRepository')
     const results = await searchRepository.hybridSearch({
       embeddingVector,
       query,
       limit: limit ?? 10,
       k: k ?? 60,
+      vectorWeight: vectorWeight ?? 1.0,
+      minScore: minScore ?? 0,
       collectionId,
       documentId,
     })
+
+    // 3. Context window 擴展（若 contextWindow > 0）
+    const effectiveWindow = contextWindow ?? 0
+    if (effectiveWindow > 0 && results.length > 0) {
+      const chunkRepository = c.get('chunkRepository')
+      const adjacentMap = await chunkRepository.getAdjacentChunks(
+        results.map((r) => r.chunkId),
+        effectiveWindow
+      )
+      const enrichedResults = results.map((r) => ({
+        ...r,
+        contextChunks: adjacentMap.get(r.chunkId) ?? { prev: [], next: [] },
+      }))
+      return c.json(enrichedResults, 200)
+    }
 
     return c.json(results, 200)
   }
