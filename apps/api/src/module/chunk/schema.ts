@@ -5,6 +5,11 @@ export const ChunkParamsSchema = z.object({
   documentId: z.uuid(),
 })
 
+export const ChunkItemParamsSchema = z.object({
+  documentId: z.uuid(),
+  chunkId: z.uuid(),
+})
+
 export const CreateChunkSchema = z.object({
   content: z.string(),
   metadata: ChunkMetadataSchema.default({}),
@@ -15,7 +20,8 @@ export type CreateChunkDto = z.infer<typeof CreateChunkSchema>
 export const ChunkSchema = z.object({
   id: z.uuid(),
   documentId: z.uuid(),
-  position: z.number().int(),
+  prevChunkId: z.uuid().nullable(),
+  nextChunkId: z.uuid().nullable(),
   content: z.string(),
   metadata: ChunkMetadataSchema,
   createdAt: z.string(),
