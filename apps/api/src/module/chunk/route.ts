@@ -1,10 +1,8 @@
 import { NotFoundException } from '@/lib/errors'
-import type { ChunkDto } from '@/module/chunk/schema'
-import { ChunkParamsSchema, ChunkSchema, CreateChunkSchema } from '@/module/chunk/schema'
+import { ChunkItemParamsSchema, ChunkParamsSchema, ChunkSchema, CreateChunkSchema } from '@/module/chunk/schema'
 import { Env } from '@/types'
 import { createRoute, OpenAPIHono } from '@hono/zod-openapi'
 import { OpenAIEmbeddings } from '@langchain/openai'
-
 
 const router = new OpenAPIHono<Env>()
 
@@ -31,11 +29,12 @@ router.openapi(
     const { content, metadata } = c.req.valid('json')
     const { documentId } = c.req.valid('param')
 
+    const documentRepository = c.get('documentRepository')
     const chunkRepository = c.get('chunkRepository')
 
-    // 1. 取得 document int id + 計算下一個 position（同時驗證 document 存在）
-    const ctx = await chunkRepository.getDocumentContext(documentId)
-    if (!ctx) throw new NotFoundException('Document not found')
+    // 1. 驗證 document 存在
+    const exists = await documentRepository.isDocumentExist(documentId)
+    if (!exists) throw new NotFoundException('Document not found')
 
     // 2. 生成 embedding（1536 維，符合 DB schema vector(1536)）
     const embeddings = new OpenAIEmbeddings({
@@ -46,27 +45,50 @@ router.openapi(
 
     // 3. 建立 chunk
     const newChunk = await chunkRepository.createChunk({
-      documentId: ctx.documentIntId,
-      position: ctx.nextPosition,
+      documentId,
       content,
       embedding: embeddingVector,
-      metadata: metadata,
+      metadata: metadata ?? {},
     })
 
-    // 4. 組裝 DTO（對外暴露 UUID，不暴露內部 serial id）
-    const chunkDto: ChunkDto = {
-      id: newChunk.chunkId,
-      documentId,
-      position: newChunk.position,
-      content: newChunk.content,
-      metadata: newChunk.metadata,
-      createdAt: newChunk.createdAt.toISOString(),
-      updatedAt: newChunk.updatedAt.toISOString(),
-    }
-
-    return c.json(chunkDto, 201)
+    return c.json(
+      {
+        id: newChunk.id,
+        documentId,
+        prevChunkId: newChunk.prevChunkId,
+        nextChunkId: newChunk.nextChunkId,
+        content: newChunk.content,
+        metadata: newChunk.metadata,
+        createdAt: newChunk.createdAt.toISOString(),
+        updatedAt: newChunk.updatedAt.toISOString(),
+      },
+      201
+    )
   }
 )
 
+// DELETE /documents/:documentId/chunks/:chunkId
+router.openapi(
+  createRoute({
+    tags: ['Chunk'],
+    summary: 'Delete a chunk',
+    description: 'Soft deletes a chunk and maintains linked list integrity by rewiring adjacent chunk pointers.',
+    method: 'delete',
+    path: '/documents/:documentId/chunks/:chunkId',
+    request: {
+      params: ChunkItemParamsSchema,
+    },
+    responses: {
+      204: { description: 'Chunk deleted' },
+      404: { description: 'Chunk not found' },
+    },
+  }),
+  async (c) => {
+    const { documentId, chunkId } = c.req.valid('param')
+    const deleted = await c.get('chunkRepository').deleteChunk(chunkId, documentId)
+    if (!deleted) throw new NotFoundException('Chunk not found')
+    return c.body(null, 204)
+  }
+)
 
 export default router
