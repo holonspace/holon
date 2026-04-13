@@ -11,7 +11,7 @@ export async function generateEmbedding(apiKey: string, text: string): Promise<n
 }
 
 export function toDto(c: {
-  collectionId: string
+  id: string
   title: string
   description: string | null
   metadata: unknown
@@ -19,7 +19,7 @@ export function toDto(c: {
   updatedAt: Date
 }): CollectionDto {
   return {
-    id: c.collectionId,
+    id: c.id,
     title: c.title,
     description: c.description ?? null,
     metadata: (c.metadata as Record<string, unknown>) ?? null,
@@ -29,7 +29,7 @@ export function toDto(c: {
 }
 
 export function toDocumentDto(d: {
-  documentId: string
+  id: string
   title: string
   description: string | null
   metadata: unknown
@@ -38,7 +38,7 @@ export function toDocumentDto(d: {
   updatedAt: Date
 }): DocumentSummaryDto {
   return {
-    id: d.documentId,
+    id: d.id,
     title: d.title,
     description: d.description ?? null,
     metadata: (d.metadata as Record<string, unknown>) ?? null,
@@ -49,7 +49,7 @@ export function toDocumentDto(d: {
 }
 
 export function toSearchResultDto(c: {
-  collectionId: string
+  id: string
   title: string
   description: string | null
   metadata: unknown

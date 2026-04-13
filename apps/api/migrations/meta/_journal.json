@@ -5,22 +5,8 @@
     {
       "idx": 0,
       "version": "7",
-      "when": 1775464016613,
-      "tag": "0000_true_lockjaw",
-      "breakpoints": true
-    },
-    {
-      "idx": 1,
-      "version": "7",
-      "when": 1775551596257,
-      "tag": "0001_superb_bloodaxe",
-      "breakpoints": true
-    },
-    {
-      "idx": 2,
-      "version": "7",
-      "when": 1775819417262,
-      "tag": "0002_giant_silver_samurai",
+      "when": 1775924899568,
+      "tag": "0000_special_boom_boom",
       "breakpoints": true
     }
   ]

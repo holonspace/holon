@@ -1,3 +1,4 @@
+import { NotFoundException } from '@/lib/errors'
 import { CreateDocumentSchema, DocumentDto, DocumentSchema } from '@/module/document/schema'
 import { Env } from '@/types'
 import { createRoute, OpenAPIHono } from '@hono/zod-openapi'
@@ -17,12 +18,19 @@ router.openapi(
         responses: { 201: { description: 'Document created successfully', content: { 'application/json': { schema: DocumentSchema } } } },
     }),
     async (c) => {
-        const body = c.req.valid('json')
+        const { collectionId, ...documentData } = c.req.valid('json')
         const documentRepository = c.get('documentRepository')
-        const document = await documentRepository.createDocument(body)
-     
+        const collectionRepository = c.get('collectionRepository')
+        const document = await documentRepository.createDocument(documentData)
+
+        if (collectionId) {
+            const collection = await collectionRepository.findCollectionByCollectionId(collectionId)
+            if (!collection) throw new NotFoundException('Collection not found')
+            await collectionRepository.addDocumentToCollection(collectionId, document.id)
+        }
+
         const documentDto: DocumentDto = {
-            id: document.documentId,
+            id: document.id,
             title: document.title,
             description: document.description,
             content: document.content,

@@ -13,7 +13,7 @@ export function createDocumentRepository(db: Database) {
         .from(document)
         .where(
           and(
-            eq(document.documentId, documentId),
+            eq(document.id, documentId),
             isNull(document.deletedAt),
           )
         )
@@ -28,7 +28,7 @@ export function createDocumentRepository(db: Database) {
         .from(document)
         .where(
           and(
-            eq(document.documentId, documentId),
+            eq(document.id, documentId),
             isNull(document.deletedAt),
           )
         )

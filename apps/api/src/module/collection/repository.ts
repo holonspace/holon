@@ -3,7 +3,11 @@ import { collection, collectionClosure, documentToCollection } from '@/db/schema
 import { document } from '@/db/schema/document'
 import type { CollectionMetadata } from '@/db/types/collection'
 import type { Document } from '@/db/types/document'
-import { and, eq, inArray, isNotNull, isNull, not, sql } from 'drizzle-orm'
+import { and, eq, inArray, isNull, not, sql } from 'drizzle-orm'
+
+// candidate pool = max(limit × 10, 100)
+const CANDIDATE_MULTIPLIER = 10
+const MIN_CANDIDATE_LIMIT = 100
 
 type CollectionRow = typeof collection.$inferSelect
 
@@ -43,7 +47,7 @@ export function createCollectionRepository(db: Database) {
       const [row] = await db
         .select()
         .from(collection)
-        .where(eq(collection.collectionId, collectionId))
+        .where(eq(collection.id, collectionId))
         .limit(1)
 
       return row ?? null
@@ -51,17 +55,16 @@ export function createCollectionRepository(db: Database) {
 
     /**
      * 列出 collections。
-     * - 不傳 ancestorInternalId：回傳所有 collections。
-     * - 傳入 ancestorInternalId：透過 collection_closure 只回傳該節點本身及其所有後代。
+     * - 不傳 ancestorId：回傳所有 collections。
+     * - 傳入 ancestorId：透過 collection_closure 只回傳該節點本身及其所有後代。
      */
-    async listCollections(ancestorInternalId?: number): Promise<CollectionRow[]> {
-      if (ancestorInternalId === undefined) {
+    async listCollections(ancestorId?: string): Promise<CollectionRow[]> {
+      if (ancestorId === undefined) {
         return db.select().from(collection)
       }
       return db
         .select({
           id: collection.id,
-          collectionId: collection.collectionId,
           title: collection.title,
           description: collection.description,
           metadata: collection.metadata,
@@ -71,7 +74,7 @@ export function createCollectionRepository(db: Database) {
         })
         .from(collection)
         .innerJoin(collectionClosure, eq(collectionClosure.descendantId, collection.id))
-        .where(eq(collectionClosure.ancestorId, ancestorInternalId))
+        .where(eq(collectionClosure.ancestorId, ancestorId))
     },
 
     /**
@@ -91,7 +94,7 @@ export function createCollectionRepository(db: Database) {
       const [updated] = await db
         .update(collection)
         .set(updateData)
-        .where(eq(collection.collectionId, collectionId))
+        .where(eq(collection.id, collectionId))
         .returning()
 
       return updated ?? null
@@ -107,7 +110,7 @@ export function createCollectionRepository(db: Database) {
         const [root] = await tx
           .select({ id: collection.id })
           .from(collection)
-          .where(eq(collection.collectionId, collectionId))
+          .where(eq(collection.id, collectionId))
           .limit(1)
 
         if (!root) return false
@@ -124,11 +127,12 @@ export function createCollectionRepository(db: Database) {
         return true
       })
     },
+
     /**
      * 檢查 ancestorId 是否為 nodeId 的祖先（含自身，depth=0）。
      * 用於循環移動檢測。
      */
-    async isDescendant(nodeId: number, ancestorId: number): Promise<boolean> {
+    async isDescendant(nodeId: string, ancestorId: string): Promise<boolean> {
       const [row] = await db
         .select({ ancestorId: collectionClosure.ancestorId })
         .from(collectionClosure)
@@ -149,9 +153,9 @@ export function createCollectionRepository(db: Database) {
      *   1. Detach — 刪除所有「descendant 在子樹內、ancestor 在子樹外」的 closure rows
      *   2. Re-attach — JS cross join (parent 祖先鏈 × node 子樹) 批量插入新 closure rows
      */
-    async moveToParent(nodeId: number, parentId: number): Promise<void> {
+    async moveToParent(nodeId: string, parentId: string): Promise<void> {
       await db.transaction(async (tx) => {
-        // 1. 取得 node 子樹的所有 internal id（含自身）
+        // 1. 取得 node 子樹的所有 id（含自身）
         const subtreeRows = await tx
           .select({ id: collectionClosure.descendantId })
           .from(collectionClosure)
@@ -208,10 +212,10 @@ export function createCollectionRepository(db: Database) {
      * 將文件加入集合。若已存在則冪等（no-op）。
      * 回傳 true 表示新增成功，false 表示已存在。
      */
-    async addDocumentToCollection(collectionInternalId: number, documentInternalId: number): Promise<boolean> {
+    async addDocumentToCollection(collectionId: string, documentId: string): Promise<boolean> {
       const result = await db
         .insert(documentToCollection)
-        .values({ collectionId: collectionInternalId, documentId: documentInternalId })
+        .values({ collectionId, documentId })
         .onConflictDoNothing()
         .returning()
 
@@ -222,13 +226,13 @@ export function createCollectionRepository(db: Database) {
      * 從集合移除文件。
      * 回傳 true 表示成功移除，false 表示關聯不存在。
      */
-    async removeDocumentFromCollection(collectionInternalId: number, documentInternalId: number): Promise<boolean> {
+    async removeDocumentFromCollection(collectionId: string, documentId: string): Promise<boolean> {
       const result = await db
         .delete(documentToCollection)
         .where(
           and(
-            eq(documentToCollection.collectionId, collectionInternalId),
-            eq(documentToCollection.documentId, documentInternalId),
+            eq(documentToCollection.collectionId, collectionId),
+            eq(documentToCollection.documentId, documentId),
           ),
         )
         .returning()
@@ -239,14 +243,14 @@ export function createCollectionRepository(db: Database) {
     /**
      * 檢查文件是否已在集合中。
      */
-    async isDocumentInCollection(collectionInternalId: number, documentInternalId: number): Promise<boolean> {
+    async isDocumentInCollection(collectionId: string, documentId: string): Promise<boolean> {
       const [row] = await db
         .select({ documentId: documentToCollection.documentId })
         .from(documentToCollection)
         .where(
           and(
-            eq(documentToCollection.collectionId, collectionInternalId),
-            eq(documentToCollection.documentId, documentInternalId),
+            eq(documentToCollection.collectionId, collectionId),
+            eq(documentToCollection.documentId, documentId),
           ),
         )
         .limit(1)
@@ -259,27 +263,26 @@ export function createCollectionRepository(db: Database) {
      * @param options.recursive 若為 true，同時包含所有子孫 collection 的文件（去重）。
      */
     async listDocumentsInCollection(
-      collectionInternalId: number,
+      collectionId: string,
       options: { recursive?: boolean } = {},
     ): Promise<Document[]> {
       const { recursive = false } = options
 
-      let targetIds: number[]
+      let targetIds: string[]
 
       if (recursive) {
         const rows = await db
           .select({ id: collectionClosure.descendantId })
           .from(collectionClosure)
-          .where(eq(collectionClosure.ancestorId, collectionInternalId))
+          .where(eq(collectionClosure.ancestorId, collectionId))
         targetIds = rows.map((r) => r.id)
       } else {
-        targetIds = [collectionInternalId]
+        targetIds = [collectionId]
       }
 
       return db
         .selectDistinct({
           id: document.id,
-          documentId: document.documentId,
           title: document.title,
           description: document.description,
           content: document.content,
@@ -299,37 +302,88 @@ export function createCollectionRepository(db: Database) {
     },
 
     /**
-     * 向量語意搜尋 collections（純 cosine similarity）。
-     * 篩選 embedding IS NOT NULL，以 cosine distance 升序排序。
-     * score = 1 − cosine_distance（0~1，越高越相關）。
+     * 向量 + 全文 RRF 混合搜尋 collections。
+     *
+     * 策略：
+     *   vector_search — cosine distance 升序，取 candidateLimit 筆
+     *   text_search   — ParadeDB BM25 (|||) 全文搜尋，取 candidateLimit 筆
+     *   combined      — FULL OUTER JOIN，以 RRF 公式融合排名
      */
     async searchCollections(opts: {
       embeddingVector: number[]
+      query: string
       limit: number
+      k: number
     }): Promise<Array<CollectionRow & { score: number }>> {
-      const { embeddingVector, limit } = opts
+      const { embeddingVector, query, limit, k } = opts
+      const candidateLimit = Math.max(limit * CANDIDATE_MULTIPLIER, MIN_CANDIDATE_LIMIT)
       const embeddingStr = `[${embeddingVector.join(',')}]`
 
-      type Row = typeof collection.$inferSelect & { score: string }
+      type Row = {
+        id: string
+        title: string
+        description: string | null
+        metadata: CollectionMetadata
+        embedding: number[] | null
+        created_at: string
+        updated_at: string
+        rrf_score: string
+      }
 
-      const rows = await db
-        .select({
-          id: collection.id,
-          collectionId: collection.collectionId,
-          title: collection.title,
-          description: collection.description,
-          metadata: collection.metadata,
-          embedding: collection.embedding,
-          createdAt: collection.createdAt,
-          updatedAt: collection.updatedAt,
-          score: sql<string>`1 - (embedding <=> ${sql.raw(`'${embeddingStr}'`)}::vector)`,
-        })
-        .from(collection)
-        .where(isNotNull(collection.embedding))
-        .orderBy(sql`embedding <=> ${sql.raw(`'${embeddingStr}'`)}::vector`)
-        .limit(limit) as Row[]
+      const rows = await db.execute<Row>(sql`
+        WITH
+        vector_search AS (
+          SELECT *,
+            ROW_NUMBER() OVER (
+              ORDER BY embedding <=> ${sql.raw(`'${embeddingStr}'`)}::vector
+            ) AS vrank
+          FROM collection
+          WHERE embedding IS NOT NULL
+          ORDER BY embedding <=> ${sql.raw(`'${embeddingStr}'`)}::vector
+          LIMIT ${candidateLimit}
+        ),
 
-      return rows.map((r) => ({ ...r, score: parseFloat(r.score) }))
+        text_search AS (
+          SELECT *,
+            ROW_NUMBER() OVER (
+              ORDER BY pdb.score(id) DESC
+            ) AS trank
+          FROM collection
+          WHERE title ||| ${query}
+          ORDER BY pdb.score(id) DESC
+          LIMIT ${candidateLimit}
+        ),
+
+        combined AS (
+          SELECT
+            COALESCE(v.id,          t.id)          AS id,
+            COALESCE(v.title,       t.title)       AS title,
+            COALESCE(v.description, t.description) AS description,
+            COALESCE(v.metadata,    t.metadata)    AS metadata,
+            COALESCE(v.embedding,   t.embedding)   AS embedding,
+            COALESCE(v.created_at,  t.created_at)  AS created_at,
+            COALESCE(v.updated_at,  t.updated_at)  AS updated_at,
+            COALESCE(1.0 / (${k} + v.vrank), 0.0) +
+            COALESCE(1.0 / (${k} + t.trank), 0.0) AS rrf_score
+          FROM vector_search v
+          FULL OUTER JOIN text_search t ON v.id = t.id
+        )
+
+        SELECT * FROM combined
+        ORDER BY rrf_score DESC
+        LIMIT ${limit}
+      `)
+
+      return rows.map((r) => ({
+        id: r.id,
+        title: r.title,
+        description: r.description,
+        metadata: r.metadata,
+        embedding: r.embedding,
+        createdAt: new Date(r.created_at),
+        updatedAt: new Date(r.updated_at),
+        score: parseFloat(r.rrf_score),
+      }))
     },
 
     /**
@@ -337,9 +391,9 @@ export function createCollectionRepository(db: Database) {
      * 只執行 Detach，保留子樹內部的 closure rows。
      * 對已是根節點的 collection 為冪等操作（no-op）。
      */
-    async removeFromParent(nodeId: number): Promise<void> {
+    async removeFromParent(nodeId: string): Promise<void> {
       await db.transaction(async (tx) => {
-        // 取得 node 子樹的所有 internal id（含自身）
+        // 取得 node 子樹的所有 id（含自身）
         const subtreeRows = await tx
           .select({ id: collectionClosure.descendantId })
           .from(collectionClosure)

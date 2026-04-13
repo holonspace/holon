@@ -1,5 +1,5 @@
 {
-  "id": "68d1a9a2-42c4-453e-a79b-5051147e962a",
+  "id": "5e8f8126-66e5-4b45-b46c-9d8c611c6411",
   "prevId": "00000000-0000-0000-0000-000000000000",
   "version": "7",
   "dialect": "postgresql",
@@ -420,6 +420,36 @@
           "method": "btree",
           "with": {}
         },
+        "chunk_prev_chunk_id_idx": {
+          "name": "chunk_prev_chunk_id_idx",
+          "columns": [
+            {
+              "expression": "prev_chunk_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
+        "chunk_next_chunk_id_idx": {
+          "name": "chunk_next_chunk_id_idx",
+          "columns": [
+            {
+              "expression": "next_chunk_id",
+              "isExpression": false,
+              "asc": true,
+              "nulls": "last"
+            }
+          ],
+          "isUnique": false,
+          "concurrently": false,
+          "method": "btree",
+          "with": {}
+        },
         "chunk_embedding_idx": {
           "name": "chunk_embedding_idx",
           "columns": [
@@ -458,36 +488,6 @@
           "with": {
             "key_field": "id"
           }
-        },
-        "chunk_prev_chunk_id_idx": {
-          "name": "chunk_prev_chunk_id_idx",
-          "columns": [
-            {
-              "expression": "prev_chunk_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
-        },
-        "chunk_next_chunk_id_idx": {
-          "name": "chunk_next_chunk_id_idx",
-          "columns": [
-            {
-              "expression": "next_chunk_id",
-              "isExpression": false,
-              "asc": true,
-              "nulls": "last"
-            }
-          ],
-          "isUnique": false,
-          "concurrently": false,
-          "method": "btree",
-          "with": {}
         }
       },
       "foreignKeys": {
@@ -508,7 +508,6 @@
           "name": "chunk_prev_chunk_id_chunk_id_fk",
           "tableFrom": "chunk",
           "tableTo": "chunk",
-          "schemaTo": "public",
           "columnsFrom": [
             "prev_chunk_id"
           ],
@@ -522,7 +521,6 @@
           "name": "chunk_next_chunk_id_chunk_id_fk",
           "tableFrom": "chunk",
           "tableTo": "chunk",
-          "schemaTo": "public",
           "columnsFrom": [
             "next_chunk_id"
           ],

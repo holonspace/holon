@@ -13,7 +13,7 @@ router.openapi(
     tags: ['Collection'],
     summary: 'Search collections',
     description:
-      'Search collections by semantic similarity using vector cosine search on title and description. Returns collections ranked by relevance score (0~1).',
+      'Search collections using hybrid RRF (vector cosine + pg_trgm full-text) search on title. Returns collections ranked by RRF fusion score.',
     method: 'post',
     path: '/collections/search',
     request: {
@@ -21,21 +21,24 @@ router.openapi(
     },
     responses: {
       200: {
-        description: 'Ranked list of matching collections with cosine similarity scores',
+        description: 'Ranked list of matching collections with RRF fusion scores',
         content: { 'application/json': { schema: CollectionSearchResultSchema.array() } },
       },
     },
   }),
   async (c) => {
-    const { query, limit } = c.req.valid('json')
+    const { query, limit, k } = c.req.valid('json')
 
     const embeddingVector = await generateEmbedding(c.env.OPENAI_API_KEY, query)
 
     const collectionRepository = c.get('collectionRepository')
     const results = await collectionRepository.searchCollections({
       embeddingVector,
+      query,
       limit: limit ?? 10,
+      k: k ?? 60,
     })
+    console.log("🚀 ~ results:", results)
 
     return c.json(results.map(toSearchResultDto), 200)
   },

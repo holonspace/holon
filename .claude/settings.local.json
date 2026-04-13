@@ -2,7 +2,11 @@
   "permissions": {
     "allow": [
       "Bash(cat apps/api/src/*.ts)",
-      "Bash(find apps/api/src/document -type f -exec cat {} \\\\;)"
+      "Bash(find apps/api/src/document -type f -exec cat {} \\\\;)",
+      "Bash(curl:*)",
+      "mcp__context7__query-docs",
+      "Bash(docker exec:*)",
+      "WebFetch(domain:zh.wikipedia.org)"
     ]
   }
 }

@@ -76,14 +76,14 @@ router.openapi(
     const { collectionId } = c.req.valid('query')
     const collectionRepository = c.get('collectionRepository')
 
-    let ancestorInternalId: number | undefined
+    let ancestorId: string | undefined
     if (collectionId !== undefined) {
       const col = await collectionRepository.findCollectionByCollectionId(collectionId)
       if (!col) throw new NotFoundException('Collection not found')
-      ancestorInternalId = col.id
+      ancestorId = col.id
     }
 
-    const collections = await collectionRepository.listCollections(ancestorInternalId)
+    const collections = await collectionRepository.listCollections(ancestorId)
 
     return c.json(collections.map(toDto), 200)
   },

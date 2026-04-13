@@ -63,10 +63,11 @@ export const DocumentCollectionParamsSchema = z.object({
 export const CollectionSearchBodySchema = z.object({
   query: z.string().min(1),
   limit: z.number().int().min(1).max(100).optional(),
+  k: z.number().int().min(1).optional().openapi({ description: 'RRF 平滑常數（預設 60）' }),
 })
 
 export const CollectionSearchResultSchema = CollectionSchema.extend({
-  score: z.number().openapi({ description: 'Cosine similarity score (0~1, higher = more relevant)' }),
+  score: z.number().openapi({ description: 'RRF fusion score (higher = more relevant)' }),
 })
 
 export const DocumentSummarySchema = z.object({

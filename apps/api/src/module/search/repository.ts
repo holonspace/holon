@@ -142,7 +142,7 @@ export function createSearchRepository(db: Database) {
         ORDER BY rrf_score DESC
         LIMIT ${limit}
       `)
-
+      
       return rows.map((row) => ({
         chunkId: row.chunk_id,
         documentId: row.doc_uuid,

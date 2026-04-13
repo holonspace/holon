@@ -1,7 +1,7 @@
 # docker-compose.yml
 services:
   postgres:
-    image: pgvector/pgvector:pg16
+    image: paradedb/paradedb:latest-pg18
     restart: unless-stopped
     environment:
       POSTGRES_USER: postgres
@@ -10,7 +10,7 @@ services:
     ports:
       - "5432:5432"
     volumes:
-      - postgres_data:/var/lib/postgresql/data
+      - postgres_data:/var/lib/postgresql
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]

@@ -6,6 +6,7 @@ export const CreateDocumentSchema = z.object({
   description: z.string().nullable().optional(),
   content: DocumentContentSchema.nullable().optional(),
   metadata: DocumentMetadataSchema.nullable().optional(),
+  collectionId: z.string().uuid().optional(),
 })
 
 export const DocumentSchema = z.object({
