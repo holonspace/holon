@@ -22,6 +22,7 @@
     "zod": "^3.25.76"
   },
   "devDependencies": {
+    "@iconify/json": "^2.2.462",
     "@tailwindcss/vite": "^4.1.18",
     "@tanstack/eslint-config": "^0.3.0",
     "@turbo/gen": "^2.8.1",
@@ -30,12 +31,15 @@
     "@types/react-dom": "^19.2.3",
     "eslint": "^9.39.2",
     "tailwindcss": "^4.1.18",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "unplugin-icons": "^23.0.1"
   },
   "exports": {
     "./globals.css": "./src/styles/globals.css",
     "./lib/*": "./src/lib/*.ts",
     "./components/*": "./src/components/*.tsx",
+    "./components/theme": "./src/components/theme/index.ts",
+    "./components/icon": "./src/components/icon/index.ts",
     "./hooks/*": "./src/hooks/*.ts"
   }
 }

@@ -1,0 +1,21 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "auth",
+  "compatibility_date": "2025-08-03",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "./src/index.tsx",
+  "kv_namespaces": [
+    {
+      "binding": "AUTH_SESSION",
+      "id": "687b57ef9e34425699b33a95942c9606"
+    }
+  ],
+  "d1_databases": [
+    {
+      "binding": "DATABASE",
+      "database_name": "holon-auth-db",
+      "database_id": "8b573028-651e-4b30-a8fa-fb051c309b1d",
+      "migrations_dir": "drizzle"
+    }
+  ]
+}

@@ -4,6 +4,8 @@
   "scripts": {
     "build": "turbo run build",
     "dev": "turbo run dev",
+    "proxy:setup:mac": "bash proxy/setup.sh",
+    "proxy:setup:win": "powershell -ExecutionPolicy Bypass -File proxy/setup.ps1",
     "lint": "turbo run lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
     "check-types": "turbo run check-types"

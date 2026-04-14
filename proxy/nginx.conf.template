@@ -1,0 +1,58 @@
+events {}
+
+http {
+    server {
+        listen 443 ssl;
+        server_name ${WEB_DOMAIN};
+
+        ssl_certificate     /etc/nginx/certs/_wildcard.${BASE_DOMAIN}+1.pem;
+        ssl_certificate_key /etc/nginx/certs/_wildcard.${BASE_DOMAIN}+1-key.pem;
+
+        location / {
+            proxy_pass http://host.docker.internal:${WEB_PORT};
+            proxy_http_version 1.1;
+            # WebSocket 支援（Vite HMR）
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_set_header Host $host;
+            proxy_set_header X-Forwarded-Proto https;
+            proxy_set_header X-Forwarded-Host $host;
+            proxy_read_timeout 3600s;
+        }
+    }
+
+    server {
+        listen 443 ssl;
+        server_name ${AUTH_DOMAIN};
+
+        ssl_certificate     /etc/nginx/certs/_wildcard.${BASE_DOMAIN}+1.pem;
+        ssl_certificate_key /etc/nginx/certs/_wildcard.${BASE_DOMAIN}+1-key.pem;
+
+        location / {
+            proxy_pass http://host.docker.internal:${AUTH_PORT};
+            proxy_http_version 1.1;
+            proxy_set_header Upgrade $http_upgrade;
+            proxy_set_header Connection "upgrade";
+            proxy_set_header Host $host;
+            proxy_set_header X-Forwarded-Proto https;
+            proxy_set_header X-Forwarded-Host $host;
+            proxy_read_timeout 3600s;
+        }
+    }
+
+    server {
+        listen 443 ssl;
+        server_name ${API_DOMAIN};
+
+        ssl_certificate     /etc/nginx/certs/_wildcard.${BASE_DOMAIN}+1.pem;
+        ssl_certificate_key /etc/nginx/certs/_wildcard.${BASE_DOMAIN}+1-key.pem;
+
+        location / {
+            proxy_pass http://host.docker.internal:${API_PORT};
+            proxy_http_version 1.1;
+            proxy_set_header Host $host;
+            proxy_set_header X-Forwarded-Proto https;
+            proxy_set_header X-Forwarded-Host $host;
+        }
+    }
+}

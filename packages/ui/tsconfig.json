@@ -11,7 +11,8 @@
     "baseUrl": ".",
     "paths": {
       "@workspace/ui/*": ["./src/*"]
-    }
+    },
+    "types": ["unplugin-icons/types/react"]
   },
   "include": ["."],
   "exclude": ["node_modules", "dist"]

@@ -18,5 +18,22 @@ services:
       timeout: 5s
       retries: 5
 
+  nginx:
+    image: nginx:alpine
+    ports:
+      - "443:443"
+    volumes:
+      - ./proxy/config.env:/etc/nginx/config.env:ro
+      - ./proxy/nginx.conf.template:/etc/nginx/nginx.conf.template:ro
+      - ./proxy/docker-entrypoint.sh:/docker-entrypoint.sh:ro
+      - ./proxy/certs:/etc/nginx/certs:ro
+    entrypoint: ["sh", "/docker-entrypoint.sh"]
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+
 volumes:
   postgres_data:

@@ -1,4 +1,5 @@
 import { HeadContent, Scripts, createRootRoute } from "@tanstack/react-router"
+import { ThemeScript } from '@workspace/ui/components/theme'
 
 import appCss from "@workspace/ui/globals.css?url"
 
@@ -30,6 +31,7 @@ function RootDocument({ children }: { children: React.ReactNode }) {
   return (
     <html lang="en">
       <head>
+        <ThemeScript />
         <HeadContent />
       </head>
       <body>

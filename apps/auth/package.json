@@ -1,0 +1,47 @@
+{
+  "name": "auth",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "$npm_execpath run build && vite preview",
+    "deploy": "$npm_execpath run build && wrangler deploy",
+    "cf-typegen": "wrangler types --env-interface CloudflareBindings",
+    "auth:generate": "npx --yes @better-auth/cli@latest generate --config src/auth/index.ts --output src/db/schema.ts -y",
+    "auth:format": "npx --yes prettier --write src/db/schema.ts",
+    "auth:update": "npm run auth:generate && npm run auth:format",
+    "db:generate": "drizzle-kit generate",
+    "db:migrate:dev": "wrangler d1 migrations apply DATABASE --local",
+    "db:migrate:prod": "wrangler d1 migrations apply DATABASE --remote",
+    "db:studio:dev": "drizzle-kit studio",
+    "db:studio:prod": "NODE_ENV=production drizzle-kit studio"
+  },
+  "dependencies": {
+    "@cloudflare/workers-types": "^4.20260414.1",
+    "@hono/react-renderer": "^1.0.1",
+    "@workspace/ui": "workspace:*",
+    "better-auth": "^1.6.2",
+    "better-auth-cloudflare": "^0.3.0",
+    "class-variance-authority": "^0.7.1",
+    "drizzle-orm": "^0.45.2",
+    "hono": "^4.12.12",
+    "react": "^19.2.4",
+    "react-dom": "^19.2.4",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.2.3",
+    "@iconify/json": "^2.2.462",
+    "@svgr/core": "^8.1.0",
+    "@svgr/plugin-jsx": "^8.1.0",
+    "@tailwindcss/vite": "^4.1.18",
+    "@types/react": "^19.2.10",
+    "@types/react-dom": "^19.2.3",
+    "@vitejs/plugin-react": "^5.1.1",
+    "drizzle-kit": "^0.31.10",
+    "unplugin-icons": "^23.0.1",
+    "vite": "^7.3.2",
+    "vite-ssr-components": "^0.5.2",
+    "wrangler": "^4.81.1"
+  }
+}
