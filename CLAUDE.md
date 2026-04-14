@@ -6,6 +6,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 **Holon** is a RAG (Retrieval-Augmented Generation) backend system. It's a pnpm + Turborepo monorepo with:
 - `apps/api` — Cloudflare Workers API built with Hono (core RAG backend)
+- `apps/auth` — Cloudflare Workers auth service (Better Auth + Hono + D1 + KV)
 - `apps/web` — React frontend (TanStack Router + TanStack Start, Vite, Tailwind v4)
 - `packages/ui` — shared UI component library (`@workspace/ui`)
 
@@ -34,6 +35,21 @@ pnpm db:migrate       # drizzle-kit migrate (apply migrations)
 pnpm db:push          # drizzle-kit push (sync schema without migrations)
 ```
 
+### Auth app (`apps/auth`)
+```sh
+pnpm dev              # vite dev server on port 5173
+pnpm deploy           # build + wrangler deploy
+pnpm cf-typegen       # regenerate CloudflareBindings types
+
+# Schema (Better Auth auto-generates Drizzle schema)
+pnpm auth:update      # regenerate + format DB schema from Better Auth config
+
+# Database (Cloudflare D1 — SQLite, NOT PostgreSQL)
+pnpm db:migrate:dev   # apply D1 migrations locally (wrangler --local)
+pnpm db:migrate:prod  # apply D1 migrations to production (wrangler --remote)
+pnpm db:studio:dev    # Drizzle Studio against local D1
+```
+
 ### Web app (`apps/web`)
 ```sh
 pnpm dev              # vite dev server on port 3000
@@ -43,8 +59,12 @@ pnpm typecheck        # tsc --noEmit
 
 ### Local infrastructure
 ```sh
-docker compose up -d  # start ParadeDB (PostgreSQL 16 + pgvector + pg_search)
+docker compose up -d  # start ParadeDB + Nginx proxy (PostgreSQL 16 + pgvector + pg_search)
 ```
+
+### Local Dev Proxy (`proxy/`)
+- Run `pnpm proxy:setup:win` (Windows Admin) or `pnpm proxy:setup:mac` once per machine to generate mkcert certs and set hosts; then `docker compose up -d` starts Nginx automatically
+- Domains configured in `proxy/config.env` (currently: `https://holon.dev` web :3000, `https://auth.holon.dev` auth :5173, `https://api.holon.dev` api :8787)
 
 ### Scripts (`scripts/`)
 ```sh
@@ -57,6 +77,11 @@ Local secrets go in `apps/api/.dev.vars` (Cloudflare Workers convention, gitigno
 ```
 DATABASE_URL=postgres://postgres:postgres@localhost:5432/holon
 OPENAI_API_KEY=sk-...   # required for collection embedding (create/search)
+```
+
+Auth app secrets go in `apps/auth/.dev.vars`:
+```
+BETTER_AUTH_SECRET=...  # random secret for session signing
 ```
 
 ## Architecture
@@ -120,3 +145,7 @@ Use typed exception classes from `src/lib/errors.ts` (e.g. `NotFoundException`, 
 - **HNSW pre-filter limitation**: HNSW indexes can't be scoped to a subset of rows efficiently. The search repository uses a two-step CTE approach — collect scoped chunk IDs first, then apply vector/BM25 ranking — rather than a simple WHERE clause on a single HNSW scan.
 - **Soft delete must always be filtered**: Queries on `document` and `chunk` must include `isNull(deletedAt)` — there's no automatic filter at the DB level.
 - **`prepare: false`**: Required for Drizzle's `postgres` driver in Cloudflare Workers (no support for prepared statement protocol).
+- **Vite binds `127.0.0.1` by default**: Docker containers reach the host via `host.docker.internal` (VM gateway, not loopback) — must set `server.host: "0.0.0.0"` in vite config or Docker gets 502.
+- **Vite HMR behind HTTPS proxy**: Set `server.hmr.clientPort: 443` + `server.hmr.host` to prevent mixed-content WebSocket errors.
+- **Auth uses D1, not PostgreSQL**: `apps/auth` connects to Cloudflare D1 (SQLite) and KV for sessions — not the ParadeDB PostgreSQL instance. Never try to point auth at `DATABASE_URL`.
+- **Better Auth schema is auto-generated**: Never hand-edit `apps/auth/src/db/schema.ts` — run `pnpm auth:update` to regenerate from `src/auth/index.ts`.
