@@ -11,7 +11,6 @@
     }
   ],
   "vars": {
-    "PUBLIC_R2_BASE_URL": "",
-    "FILE_SIGNING_SECRET": ""
+    "PUBLIC_R2_BASE_URL": ""
   }
 }
