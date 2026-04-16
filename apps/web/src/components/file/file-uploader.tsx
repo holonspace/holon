@@ -5,24 +5,21 @@ import { useRef, useState } from 'react'
 const ACCEPTED_TYPES = '.pdf,image/*'
 
 export function FileUploader() {
-  const { state, upload, pause, resume, abort } = useFileUpload()
+  const { state, upload, pause, resume, abort, reset } = useFileUpload()
   const [visibility, setVisibility] = useState<'public' | 'private'>('private')
+  const [hasFile, setHasFile] = useState(false)
   const fileRef = useRef<File | null>(null)
   const inputRef = useRef<HTMLInputElement>(null)
 
   function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
-    const file = e.target.files?.[0]
-    if (!file) return
+    const file = e.target.files?.[0] ?? null
     fileRef.current = file
+    setHasFile(file !== null)
   }
 
   function handleUpload() {
     if (!fileRef.current) return
     upload(fileRef.current, visibility)
-  }
-
-  function handlePause() {
-    pause()
   }
 
   function handleResume() {
@@ -34,6 +31,14 @@ export function FileUploader() {
     abort()
     if (inputRef.current) inputRef.current.value = ''
     fileRef.current = null
+    setHasFile(false)
+  }
+
+  function handleReset() {
+    reset()
+    if (inputRef.current) inputRef.current.value = ''
+    fileRef.current = null
+    setHasFile(false)
   }
 
   const { status, progress, url, error } = state
@@ -52,8 +57,9 @@ export function FileUploader() {
       />
 
       <div className="flex gap-2 items-center">
-        <label className="text-sm font-medium">Visibility:</label>
+        <label htmlFor="visibility" className="text-sm font-medium">Visibility:</label>
         <select
+          id="visibility"
           value={visibility}
           onChange={e => setVisibility(e.target.value as 'public' | 'private')}
           disabled={status === 'uploading' || status === 'hashing'}
@@ -80,23 +86,28 @@ export function FileUploader() {
       {/* Action buttons */}
       <div className="flex gap-2 flex-wrap">
         {(status === 'idle' || status === 'error') && (
-          <Button onClick={handleUpload} disabled={!fileRef.current}>
+          <Button onClick={handleUpload} disabled={!hasFile}>
             Upload
           </Button>
         )}
         {status === 'uploading' && (
-          <Button variant="outline" onClick={handlePause}>
+          <Button variant="outline" onClick={pause}>
             Pause
           </Button>
         )}
         {status === 'paused' && (
-          <Button onClick={handleResume} disabled={!fileRef.current}>
+          <Button onClick={handleResume} disabled={!hasFile}>
             Resume
           </Button>
         )}
         {(status === 'uploading' || status === 'paused') && (
           <Button variant="outline" onClick={handleAbort}>
             Cancel
+          </Button>
+        )}
+        {status === 'complete' && (
+          <Button variant="outline" onClick={handleReset}>
+            Upload another
           </Button>
         )}
       </div>
