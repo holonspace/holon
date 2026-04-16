@@ -1,3 +1,4 @@
+import { NotFoundException } from '@/lib/errors'
 import { UploadState, UploadedPartDto } from '@/module/file/schema'
 
 // ─── Key helpers ──────────────────────────────────────────────────────────────
@@ -88,20 +89,26 @@ export function createFileRepository(bucket: R2Bucket, signingSecret: string, pu
     ): Promise<UploadedPartDto> {
       const sk = stateKey(userId, hash)
       const stateObj = await bucket.get(sk)
-      if (!stateObj) throw new Error('Upload state not found')
+      if (!stateObj) throw new NotFoundException('Upload state not found — upload may have been aborted or completed')
 
       const state: UploadState = await stateObj.json()
+
+      // Check idempotency BEFORE calling R2 — avoids re-uploading a part
+      // that was already confirmed in state (saves bandwidth and avoids etag mismatch).
+      // Note: state read-modify-write is not atomic under concurrent retries;
+      // the client should not send the same part concurrently.
+      const existing = state.completedParts.find(p => p.partNumber === partNumber)
+      if (existing) {
+        return { partNumber: existing.partNumber, etag: existing.etag }
+      }
+
       const fk = fileKey(userId, hash, state.filename)
       const multipart = bucket.resumeMultipartUpload(fk, state.uploadId)
       const uploaded = await multipart.uploadPart(partNumber, body)
 
-      // Update completed parts in state
-      const alreadyDone = state.completedParts.some(p => p.partNumber === partNumber)
-      if (!alreadyDone) {
-        state.completedParts.push({ partNumber: uploaded.partNumber, etag: uploaded.etag })
-        state.completedParts.sort((a, b) => a.partNumber - b.partNumber)
-        await bucket.put(sk, JSON.stringify(state))
-      }
+      state.completedParts.push({ partNumber: uploaded.partNumber, etag: uploaded.etag })
+      state.completedParts.sort((a, b) => a.partNumber - b.partNumber)
+      await bucket.put(sk, JSON.stringify(state))
 
       return { partNumber: uploaded.partNumber, etag: uploaded.etag }
     },
@@ -111,7 +118,7 @@ export function createFileRepository(bucket: R2Bucket, signingSecret: string, pu
     async completeUpload(
       userId: string,
       hash: string,
-      parts: UploadedPartDto[],
+      _clientParts: UploadedPartDto[],  // kept for API compatibility; server state is authoritative
     ): Promise<{
       fileId: string
       url: string
@@ -122,13 +129,15 @@ export function createFileRepository(bucket: R2Bucket, signingSecret: string, pu
     }> {
       const sk = stateKey(userId, hash)
       const stateObj = await bucket.get(sk)
-      if (!stateObj) throw new Error('Upload state not found')
+      if (!stateObj) throw new NotFoundException('Upload state not found — upload may have been aborted or completed')
 
       const state: UploadState = await stateObj.json()
       const fk = fileKey(userId, hash, state.filename)
       const multipart = bucket.resumeMultipartUpload(fk, state.uploadId)
 
-      const sorted = [...parts].sort((a, b) => a.partNumber - b.partNumber)
+      // Use server-authoritative completed parts from state, not client-supplied list.
+      // This prevents clients from spoofing etags or part numbers.
+      const sorted = [...state.completedParts].sort((a, b) => a.partNumber - b.partNumber)
       await multipart.complete(sorted)
       await bucket.delete(sk)
 
@@ -171,14 +180,16 @@ export function createFileRepository(bucket: R2Bucket, signingSecret: string, pu
       object: R2Object
       key: string
     } | null> {
+      // Each userId/hash/ prefix holds at most 2 objects (state + file), so
+      // truncation is not a concern in practice. We use list() rather than
+      // head() because we don't know the filename ahead of time.
       const listed = await bucket.list({ prefix: `${userId}/${hash}/` })
       const file = listed.objects.find(o => !o.key.endsWith('/.upload-state'))
       if (!file) return null
 
-      const object = await bucket.head(file.key)
-      if (!object) return null
-
-      return { object, key: file.key }
+      // R2Objects returned by list() already carry full metadata (customMetadata,
+      // httpMetadata, size, etag). Avoid a second bucket.head() round-trip.
+      return { object: file, key: file.key }
     },
 
     // ── Stream File (for signed download) ────────────────────────────────────
@@ -204,7 +215,9 @@ export function createFileRepository(bucket: R2Bucket, signingSecret: string, pu
       const exp = Math.floor(Date.now() / 1000) + 3600  // 1 hour
       const payload = `${fileId}:${userId}:${exp}`
       const sig = await hmacSign(signingSecret, payload)
+      // base64url encode (URL-safe: no +, /, or = padding) for safe query-string embedding
       const data = btoa(JSON.stringify({ fileId, userId, exp }))
+        .replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
       return `${data}.${sig}`
     },
 
@@ -215,9 +228,13 @@ export function createFileRepository(bucket: R2Bucket, signingSecret: string, pu
       const data = token.slice(0, dotIdx)
       const sig = token.slice(dotIdx + 1)
 
+      // Restore standard base64 from base64url
+      const b64 = data.replace(/-/g, '+').replace(/_/g, '/')
+      const padded = b64 + '='.repeat((4 - b64.length % 4) % 4)
+
       let parsed: { fileId: string; userId: string; exp: number }
       try {
-        parsed = JSON.parse(atob(data))
+        parsed = JSON.parse(atob(padded))
       } catch {
         return null
       }
