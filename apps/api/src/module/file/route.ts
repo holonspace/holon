@@ -1,4 +1,4 @@
-import { BadRequestException, ForbiddenException, NotFoundException } from '@/lib/errors'
+import { BadRequestException, ForbiddenException, NotFoundException, UnauthorizedException } from '@/lib/errors'
 import {
   CHUNK_SIZE,
   CompleteUploadSchema,
@@ -17,7 +17,9 @@ const router = new OpenAPIHono<Env>()
 // ─── Helper: read userId from header ─────────────────────────────────────────
 
 function getUserId(c: { req: { header: (name: string) => string | undefined } }): string {
-  return c.req.header('X-User-Id') ?? 'mock-user-001'
+  const id = c.req.header('X-User-Id')
+  if (!id) throw new UnauthorizedException('Missing X-User-Id header')
+  return id
 }
 
 // ─── POST /files/upload/start ─────────────────────────────────────────────────
@@ -51,7 +53,11 @@ router.openapi(
       chunkSize: CHUNK_SIZE,
       totalParts,
       completedParts: state.completedParts,
-      startFrom: state.completedParts.length + 1,
+      // Find the first part number not yet in completedParts (handles non-sequential gaps)
+      startFrom: (() => {
+        const done = new Set(state.completedParts.map(p => p.partNumber))
+        return (Array.from({ length: totalParts }, (_, i) => i + 1).find(n => !done.has(n)) ?? totalParts + 1)
+      })(),
     }, 200)
   },
 )
@@ -249,7 +255,7 @@ router.openapi(
     return new Response(body.body, {
       headers: {
         'Content-Type': contentType,
-        'Content-Disposition': `inline; filename="${filename}"`,
+        'Content-Disposition': `inline; filename*=UTF-8''${encodeURIComponent(filename)}`,
         'Cache-Control': 'private, max-age=3600',
       },
     })
