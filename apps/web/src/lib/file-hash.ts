@@ -25,12 +25,14 @@ export async function computeFileHash(file: File): Promise<string> {
     chunks.push(await readSlice(file, size - TAIL_SIZE, size))
   }
 
-  // Middle samples
-  for (const point of SAMPLE_POINTS) {
-    const start = Math.floor(size * point)
-    if (start + SAMPLE_SIZE > size - TAIL_SIZE && size > HEAD_SIZE + TAIL_SIZE) continue
-    if (start < HEAD_SIZE && size > HEAD_SIZE) continue
-    chunks.push(await readSlice(file, start, start + SAMPLE_SIZE))
+  // Middle samples (skip if head already covers the whole file)
+  if (size > HEAD_SIZE) {
+    for (const point of SAMPLE_POINTS) {
+      const start = Math.floor(size * point)
+      if (start + SAMPLE_SIZE > size - TAIL_SIZE && size > HEAD_SIZE + TAIL_SIZE) continue
+      if (start < HEAD_SIZE) continue
+      chunks.push(await readSlice(file, start, start + SAMPLE_SIZE))
+    }
   }
 
   // Append fileSize as 8-byte little-endian uint64

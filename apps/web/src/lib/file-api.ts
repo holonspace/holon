@@ -53,6 +53,8 @@ async function apiRequest<T>(
     const body = await res.text().catch(() => '')
     throw new Error(`API ${res.status}: ${body}`)
   }
+  // 204 No Content (DELETE endpoints) — no body to parse
+  if (res.status === 204) return undefined as T
   return res.json() as Promise<T>
 }
 
