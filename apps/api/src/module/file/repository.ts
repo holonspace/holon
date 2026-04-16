@@ -181,15 +181,17 @@ export function createFileRepository(bucket: R2Bucket, signingSecret: string, pu
       key: string
     } | null> {
       // Each userId/hash/ prefix holds at most 2 objects (state + file), so
-      // truncation is not a concern in practice. We use list() rather than
-      // head() because we don't know the filename ahead of time.
+      // truncation is not a concern in practice. We use list() to discover the key
+      // (filename is unknown without reading state), then head() to get full metadata
+      // (customMetadata and httpMetadata are not guaranteed in list() results).
       const listed = await bucket.list({ prefix: `${userId}/${hash}/` })
       const file = listed.objects.find(o => !o.key.endsWith('/.upload-state'))
       if (!file) return null
 
-      // R2Objects returned by list() already carry full metadata (customMetadata,
-      // httpMetadata, size, etag). Avoid a second bucket.head() round-trip.
-      return { object: file, key: file.key }
+      const object = await bucket.head(file.key)
+      if (!object) return null
+
+      return { object, key: file.key }
     },
 
     // ── Stream File (for signed download) ────────────────────────────────────
