@@ -23,13 +23,13 @@ export const StartUploadSchema = z.object({
 
 export const UploadedPartSchema = z.object({
   partNumber: z.number().int().min(1),
-  etag: z.string(),
+  etag: z.string().min(1),
 })
 
 export const StartUploadResponseSchema = z.object({
   uploadId: z.string(),
-  chunkSize: z.number(),
-  totalParts: z.number(),
+  chunkSize: z.number().int(),
+  totalParts: z.number().int(),
   completedParts: z.array(UploadedPartSchema),
   startFrom: z.number().int().min(1),
 })
@@ -38,14 +38,14 @@ export const StartUploadResponseSchema = z.object({
 
 export const UploadPartResponseSchema = z.object({
   partNumber: z.number().int().min(1),
-  etag: z.string(),
+  etag: z.string().min(1),
 })
 
 // ─── Complete Upload ──────────────────────────────────────────────────────────
 
 export const CompleteUploadSchema = z.object({
   hash: z.string().min(64).max(64),
-  parts: z.array(UploadedPartSchema).min(1),
+  parts: z.array(UploadedPartSchema).min(1).max(10000),
 })
 
 export const CompleteUploadResponseSchema = z.object({
@@ -54,7 +54,7 @@ export const CompleteUploadResponseSchema = z.object({
   visibility: z.enum(['public', 'private']),
   filename: z.string(),
   contentType: z.string(),
-  size: z.number(),
+  size: z.number().int(),
 })
 
 // ─── File Access ──────────────────────────────────────────────────────────────
