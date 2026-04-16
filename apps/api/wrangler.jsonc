@@ -3,5 +3,15 @@
   "name": "api",
   "main": "src/index.ts",
   "compatibility_date": "2026-04-05",
-  "compatibility_flags": ["nodejs_compat"]
+  "compatibility_flags": ["nodejs_compat"],
+  "r2_buckets": [
+    {
+      "binding": "FILE_BUCKET",
+      "bucket_name": "holon-files"
+    }
+  ],
+  "vars": {
+    "PUBLIC_R2_BASE_URL": "",
+    "FILE_SIGNING_SECRET": ""
+  }
 }
