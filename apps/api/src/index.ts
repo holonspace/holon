@@ -1,14 +1,14 @@
 import { createDB } from '@/db'
-import { chunkRoute, collectionRoute, documentRoute, searchRoute } from '@/module'
+import { chunkRoute, collectionRoute, documentRoute, fileRoute, searchRoute } from '@/module'
 import { createChunkRepository } from '@/module/chunk/repository'
 import { createCollectionRepository } from '@/module/collection/repository'
 import { createDocumentRepository } from '@/module/document/repository'
+import { createFileRepository } from '@/module/file/repository'
 import { createSearchRepository } from '@/module/search/repository'
 import { Env } from '@/types'
 import { swaggerUI } from '@hono/swagger-ui'
 import { OpenAPIHono } from '@hono/zod-openapi'
 import { HTTPException } from 'hono/http-exception'
-
 
 const app = new OpenAPIHono<Env>()
 
@@ -19,6 +19,11 @@ app.use('*', async (c, next) => {
   c.set('chunkRepository', createChunkRepository(db))
   c.set('searchRepository', createSearchRepository(db))
   c.set('collectionRepository', createCollectionRepository(db))
+  c.set('fileRepository', createFileRepository(
+    c.env.FILE_BUCKET,
+    c.env.FILE_SIGNING_SECRET,
+    c.env.PUBLIC_R2_BASE_URL,
+  ))
   await next()
 })
 
@@ -34,6 +39,7 @@ app.route('/', documentRoute)
 app.route('/', chunkRoute)
 app.route('/', searchRoute)
 app.route('/', collectionRoute)
+app.route('/', fileRoute)
 
 app.get('/ui', swaggerUI({ url: '/doc' }))
 
