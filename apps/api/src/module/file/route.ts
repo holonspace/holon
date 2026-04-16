@@ -1,8 +1,8 @@
 import { BadRequestException, ForbiddenException, NotFoundException, UnauthorizedException } from '@/lib/errors'
 import {
   CHUNK_SIZE,
-  CompleteUploadSchema,
   CompleteUploadResponseSchema,
+  CompleteUploadSchema,
   GetFileResponseSchema,
   StartUploadResponseSchema,
   StartUploadSchema,
@@ -125,6 +125,7 @@ router.openapi(
     const repo = c.get('fileRepository')
 
     const result = await repo.completeUpload(userId, hash, parts)
+    console.log("🚀 ~ result:", result)
     return c.json(result, 200)
   },
 )

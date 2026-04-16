@@ -8,9 +8,17 @@ import { createSearchRepository } from '@/module/search/repository'
 import { Env } from '@/types'
 import { swaggerUI } from '@hono/swagger-ui'
 import { OpenAPIHono } from '@hono/zod-openapi'
+import { cors } from 'hono/cors'
 import { HTTPException } from 'hono/http-exception'
 
 const app = new OpenAPIHono<Env>()
+
+app.use('*', cors({
+  origin: '*',
+  allowMethods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowHeaders: ['Content-Type', 'X-User-Id'],
+  maxAge: 600,
+}))
 
 app.use('*', async (c, next) => {
   const db = createDB(c.env.DATABASE_URL)

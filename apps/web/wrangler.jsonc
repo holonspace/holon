@@ -1,0 +1,30 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "flamewood-app",
+  "compatibility_date": "2026-01-28",
+  "compatibility_flags": ["nodejs_compat"],
+  "main": "@tanstack/react-start/server-entry",
+  "observability": {
+    "enabled": true,
+  },
+  "vars": {
+    "ENVIRONMENT": "production",
+    "ALLOWED_ORIGINS": "http://localhost:3000",
+    "BETTER_AUTH_URL": "http://localhost:3000",
+    "BETTER_AUTH_SECRET": "287f46b0b694336317992c77f6421a2c14e4e79aa0704a19167506ea7f9616db",
+  },
+  "kv_namespaces": [
+    {
+      "binding": "AUTH_SESSION",
+      "id": "687b57ef9e34425699b33a95942c9606",
+    },
+  ],
+  "d1_databases": [
+    {
+      "binding": "DATABASE",
+      "database_name": "flamewood-auth-db",
+      "database_id": "bf4e9a6c-cb75-4948-b36b-338b9d18b12d",
+      "migrations_dir": "drizzle",
+    },
+  ],
+}
